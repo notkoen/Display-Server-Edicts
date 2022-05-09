@@ -1,0 +1,33 @@
+"Phrases"
+{
+	"Print Edict"
+	{
+		// 1: Edict Count
+		"#format"	"{1:d}"
+		"en"		"{darkred}[Edicts] {default}Current edict count: {green}{1:d}{default}."
+	}
+	
+	"Enable Edict Display"
+	{
+		"en"		"{darkred}[Edicts] {default}Edict count display is now {green}ENABLED{default}."
+	}
+	
+	"Disable Edict Display"
+	{
+		"en"		"{darkred}[Edicts] {default}Edict count display is now {red}DISABLED{default}."
+	}
+	
+	"Display Center Text"
+	{
+		// 1: Edict Count
+		"#format"	"{1:d}"
+		"en"		"<font color='#FF0000'>Edicts</font>: <font color='#00FF00'>{1}</font>"
+	}
+	
+	"Display Game Text"
+	{
+		// 1: Edict Count
+		"#format"	"{1:d}"
+		"en"		"Edicts: {1}"
+	}
+}
