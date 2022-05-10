@@ -30,4 +30,9 @@
 		"#format"	"{1:d}"
 		"en"		"Edicts: {1}"
 	}
+	
+	"Display Command Disabled"
+	{
+		"en"		"{darkred}[Edicts] {default}Edict display is currently {red}DISABLED{default}."
+	}
 }
