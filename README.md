@@ -19,6 +19,6 @@ A CS:GO SourceMod plugin for displaying live server edict count. Useful for test
 ## 1.0
 - Initial Commit
 ## 1.1
-- Fix incorrect edict amount being reported by replacing `GetEdictCount()` with a separate function utilizing `IsValidEdict()`
+- Fix incorrect edict amount being reported by replacing `GetEntityCount()` with a separate function utilizing `IsValidEdict()`
 - Added a cvar option to disable the display command and timer
 - If `sm_edict_display_enable` is changed mid-game, plugin will now automatically start or stop the update timer
