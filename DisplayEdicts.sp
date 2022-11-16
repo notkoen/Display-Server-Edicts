@@ -2,22 +2,23 @@
 #pragma newdecls required
 
 #include <sourcemod>
-#include <csgocolors_fix>
 #include <DynamicChannels> // https://github.com/Vauff/DynamicChannels
 
 // Display status
 bool g_bDisplayEdicts[MAXPLAYERS + 1] = {false, ...};
 
+// Display position
+#define POS_X 0.15
+#define POS_Y 0.0
+
 // Convars
-ConVar g_cDisplayChannel;
-ConVar g_cDisplayStyle;
-ConVar g_cDisplayUpdateRate;
-ConVar g_cDisplayPos;
-ConVar g_cEdictThreshold, g_cEdictDeath;
-ConVar g_cEnableTimer;
+ConVar g_cvChannel;
+ConVar g_cvStyle;
+ConVar g_cvRate;
+ConVar g_cvLimit;
+ConVar g_cvEnable;
 
 // Global variables
-float g_flPosX, g_flPosY;
 bool g_bTimer;
 
 // Timer handle
@@ -28,27 +29,22 @@ public Plugin myinfo =
 	name = "Display Edicts",
 	author = "notkoen", // Thanks to tilgep for help with optimizations
 	description = "Display live server edicts",
-	version = "2.1",
+	version = "2.3",
 	url = "https://github.com/notkoen"
 };
 
 public void OnPluginStart()
 {
-	// Load plugin translations
-	LoadTranslations("displayedicts.phrases");
-	
 	// Convars
-	g_cDisplayChannel = CreateConVar("sm_edict_channel", "5", "game_text display method channel", _, true, 0.0, true, 5.0);
-	g_cDisplayStyle = CreateConVar("sm_edict_style", "1", "How should edicts be displayed? (1: game_text, 2: Center Text, 3: both)", _, true, 1.0, true, 3.0);
-	g_cDisplayUpdateRate = CreateConVar("sm_edict_update", "1", "How often should edict display update (in seconds)", _, true, 0.5, true, 30.0);
-	g_cDisplayPos = CreateConVar("sm_edict_pos", "0.35 1.00", "Position of game_text display");
-	g_cEdictThreshold = CreateConVar("sm_edict_threshold", "1750", "Minimum amount of edicts before a warning is given", _, true, 0.0, true, 2048.0);
-	g_cEdictDeath = CreateConVar("sm_edict_deathvalue", "1950", "Minimum amount of edicts before the death warning is given", _, true, 0.0, true, 2048.0);
+	g_cvChannel = CreateConVar("sm_edict_channel", "5", "game_text display method channel", _, true, 0.0, true, 5.0);
+	g_cvStyle = CreateConVar("sm_edict_style", "1", "How should edicts be displayed? (1: game_text, 2: Center Text)", _, true, 1.0, true, 2.0);
+	g_cvRate = CreateConVar("sm_edict_update", "1", "How often should edict display update (in seconds)", _, true, 0.5, true, 30.0);
+	g_cvLimit = CreateConVar("sm_edict_deathvalue", "1950", "Minimum amount of edicts before the death warning is given", _, true, 0.0, true, 2048.0);
 	
 	// Toggle timer cvar
-	g_cEnableTimer = CreateConVar("sm_edict_enable_timer", "0", "Toggle update timer (Setting to 0 will disable live display & warnings)", _, true, 0.0, true, 1.0);
-	g_bTimer = g_cEnableTimer.BoolValue;
-	HookConVarChange(g_cEnableTimer, OnTimerToggle);
+	g_cvEnable = CreateConVar("sm_edict_enable_timer", "0", "Toggle update timer (Setting to 0 will disable live display & warnings)", _, true, 0.0, true, 1.0);
+	g_bTimer = g_cvEnable.BoolValue;
+	HookConVarChange(g_cvEnable, OnTimerToggle);
 	
 	// Autoexecute config
 	AutoExecConfig(true, "DisplayEdicts");
@@ -78,7 +74,7 @@ stock int GetEdictCount()
 	return EdictCount;
 }
 
-// Hook g_cEnableTimer convar change
+// Hook g_cvEnable convar change
 public void OnTimerToggle(ConVar cvar, const char[] oldValue, const char[] newValue)
 {
 	// Use new value for functions
@@ -89,14 +85,14 @@ public void OnTimerToggle(ConVar cvar, const char[] oldValue, const char[] newVa
 	delete g_hDisplayUpdate;
 	if (g_bTimer)
 	{
-		g_hDisplayUpdate = CreateTimer(g_cDisplayUpdateRate.FloatValue, UpdateEdictDisplay, _, TIMER_REPEAT);
+		g_hDisplayUpdate = CreateTimer(g_cvRate.FloatValue, UpdateEdictDisplay, _, TIMER_REPEAT);
 	}
 }
 
 // Start display update timer when confg is executed
 public void OnConfigsExecuted()
 {
-	g_hDisplayUpdate = CreateTimer(g_cDisplayUpdateRate.FloatValue, UpdateEdictDisplay, _, TIMER_REPEAT);
+	g_hDisplayUpdate = CreateTimer(g_cvRate.FloatValue, UpdateEdictDisplay, _, TIMER_REPEAT);
 }
 
 // Delete timer when map ends
@@ -108,44 +104,26 @@ public void OnMapEnd()
 // Timer Event
 public Action UpdateEdictDisplay(Handle timer)
 {
-	// Convert position cvar to 
-	char buffer[32];
-	char split[2][16];
-	g_cDisplayPos.GetString(buffer, sizeof(buffer));
-	int count = ExplodeString(buffer, " ", split, sizeof(split), sizeof(split[]), true);
-	
-	if (count != 2) LogError("[EDICTS] Invalid game_text position specified");
-	else
-	{
-		g_flPosX = StringToFloat(split[0]);
-		g_flPosY = StringToFloat(split[1]);
-	}
-	
 	// Store edict count to a variable and then check if it is past the limits
 	int eCount = GetEdictCount();
-	if (eCount > g_cEdictDeath.IntValue)
-		CPrintToChatAll("%t", "Server Is About to Die", eCount);
-	else if (eCount > g_cEdictThreshold.IntValue)
-		CPrintToChatAll("%t", "Edict Threshold Reached", eCount);
+	if (eCount > g_cvLimit.IntValue)
+		PrintToChatAll(" \x04[Edicts] \x02Warning! \x01Number of edicts has reached a dangerous level! (\x04%d\x01/2048)", eCount);
 	
 	for (int client = 1; client <= MaxClients; client++)
 	{
 		if (IsValidClient(client) && g_bDisplayEdicts[client])
 		{
-			if (g_cDisplayStyle.IntValue == 1)
+			switch (g_cvStyle.IntValue)
 			{
-				SetHudTextParams(g_flPosX, g_flPosY, g_cDisplayUpdateRate.FloatValue, 255, 255, 255, 255, 0, 0.0, 0.0, 0.0);
-				ShowHudText(client, GetDynamicChannel(g_cDisplayChannel.IntValue), "%t", "Display Game Text", GetEdictCount());
-			}
-			else if (g_cDisplayStyle.IntValue == 2)
-			{
-				PrintCenterText(client, "%t", "Display Center Text", GetEdictCount());
-			}
-			else
-			{
-				SetHudTextParams(g_flPosX, g_flPosY, g_cDisplayUpdateRate.FloatValue, 255, 255, 255, 255, 0, 0.0, 0.0, 0.0);
-				ShowHudText(client, GetDynamicChannel(g_cDisplayChannel.IntValue), "%t", "Display Game Text", GetEdictCount());
-				PrintCenterText(client, "%t", "Display Center Text", GetEdictCount());
+				case 1:
+				{
+					SetHudTextParams(POS_X, POS_Y, g_cvRate.FloatValue, 0, 255, 0, 255, 0, 0.0, 0.0, 0.0);
+					ShowHudText(client, GetDynamicChannel(g_cvChannel.IntValue), "Edicts: %d/2048", eCount);
+				}
+				case 2:
+				{
+					PrintCenterText(client, "<font color='#FF0000'>Edicts</font>: <font color='#00FF00'>{1}</font>/2048", eCount);
+				}
 			}
 		}
 	}
@@ -155,7 +133,7 @@ public Action UpdateEdictDisplay(Handle timer)
 // Print Edicts Command
 public Action Command_PrintEdicts(int client, int args)
 {
-	CPrintToChat(client, "%t", "Print Edict", GetEdictCount());
+	PrintToChat(client, " \x04[Edicts] \x01Current number of edicts: \x04%d\x01/2048", GetEdictCount());
 	return Plugin_Handled;
 }
 
@@ -163,13 +141,12 @@ public Action Command_PrintEdicts(int client, int args)
 public Action Command_ToggleDisplay(int client, int args)
 {
 	g_bDisplayEdicts[client] = !g_bDisplayEdicts[client];
-	if (g_bDisplayEdicts[client])
-	{
-		CPrintToChat(client, "%t", "Enable Edict Display");
-	}
-	else
-	{
-		CPrintToChat(client, "%t", "Disable Edict Display");
-	}
+	PrintToChat(client, " \x04[Edicts] \x01Edict counter display is now %s\x01.", g_bDisplayEdicts[client] ? "\x04enabled" : "\x02disabled");
 	return Plugin_Handled;
+}
+
+// Reset client index preference on disconnect
+public void OnClientDisconnect(int client)
+{
+	g_bDisplayEdicts[client] = false;
 }
